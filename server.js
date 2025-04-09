@@ -10,6 +10,8 @@ const server = http.createServer((req, res) => {
 }).listen(8000);
 
 server.on('upgrade', (req, socket, head) => {
+    console.log(req.headers);
+
     if (!req.headers['sec-websocket-accept']) {
         socket.write('HTTP/1.1 400 Bad Request\r\n' +
             '\r\n');
@@ -17,14 +19,26 @@ server.on('upgrade', (req, socket, head) => {
         return;
     }
 
+    const clientID = crypto.randomUUID();
+
     const preImage = req.headers['sec-websocket-accept'] + WEBSOCKET_MAGIC_STRING;
     const acceptHeader = crypto.createHash('sha1').update(preImage).digest('base64');
 
     const headers = [
         'HTTP/1.1 101 Switching Protocols',
         'Connection: upgrade',
+        'Upgrade: websocket',
         `Sec-WebSocket-Accept: ${acceptHeader}`,
-        '',
+        '\r\n',
     ];
     socket.write(headers.join('\r\n'));
+    socket.pipe(socket);
+
+    socket.on('data', data => {
+        console.log(`Recieved data from ${clientID}: ${data}`);
+    });
+
+    socket.on('end', () => {
+        console.log(`Client ${clientID} diconnected`);
+    });
 });
